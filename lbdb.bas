@@ -18,17 +18,18 @@ UpperLeftX=200
 UpperLeftY=300
 
 'global variable/array setup
-dim actions$(3)
-actionstr$ = "create report update"
-for i=1 to 3
+dim actions$(4)
+actionstr$ = "create report update delete"
+for i=1 to 4
     actions$(i) = word$(actionstr$, i)
 next
 
 'set up global variables and arrays
 dim filenames$(2), rowlist$(100, 4), varlist$(100, 2)
-global filenames$, fieldstatement$, varcount, reporting, updating
+global filenames$, fieldstatement$, varcount, reporting, updating, deleting
 reporting = 0
 updating = 0
+deleting = 0
 
 'graphical setup
 combobox #win.label, actions$(), [donothing], 5, 15, 75, 19
@@ -167,7 +168,7 @@ function runtmp$(new)
     if len(fieldstatement$) > 0 then
         field$ = fieldstatement$
     else
-        if reporting = 0 and updating = 0 then
+        if reporting = 0 and updating = 0 and deleting = 0 then
             field$ = "field #1,_"
         else
             field$ = ""
@@ -200,9 +201,17 @@ function appendfield$(file$)
 end function
 
 'define given field variables
-function definefields$()
+function definefields$(deleting)
     for n=1 to varcount
-        prompt rowlist$(n, 3)+" = "; value$
+        if not(deleting) then
+            prompt rowlist$(n, 3)+" = "; value$
+        else
+            if instr(rowlist$(n, 3), "$") > 0 then
+                value$ = ""
+            else
+                value$ = "0"
+            end if
+        end if
         varlist$(n,1) = rowlist$(n, 3)
         varlist$(n,2) = value$
         print #outbas, rowlist$(n, 3)+" = "+rowlist$(n, 4)+value$+rowlist$(n, 4)
@@ -300,12 +309,12 @@ function getfield$()
 end function
 
 'update/insert values
-function update$(uponcreating)
+function update$(uponcreating, deleting)
     if not(uponcreating) then
         field$ = getfield$()
         #log getfieldvars$(field$)
     end if
-    #log definefields$()
+    #log definefields$(deleting)
     prompt "at which index?"; index$
     print #outbas, field$
     print #outbas, "put #1, "+index$
@@ -314,6 +323,12 @@ function update$(uponcreating)
     close #outbas
     #log tokenize$(filenames$(2))
     update$ = "db updated..."
+end function
+
+'delete by index
+function delete$()
+    #log update$(0, 1)
+    delete$ = "deleted row..."
 end function
 
 'report values from table at index
@@ -386,8 +401,8 @@ function create$()
     wend
     varcount = i - 1
     print #outbas, ""
-    #log update$(1)
-    'kill "tmp.bas"
+    #log update$(1, 0)
+    kill "tmp.bas"
     kill "tmp.tkn"
     create$ = "db created..."
 end function
@@ -400,7 +415,7 @@ function clearvars$()
     varcount = 0
     reporting = 0
     updating = 0
-    dim
+    deleting = 0
 end function
 
 'error handling
@@ -425,15 +440,21 @@ end function
         filepath$ = openfile$(1)
         #log create$()
     end if
-    if cmd$ = "update" or cmd$ = "report" then
+    if cmd$ = "update" or cmd$ = "report" or cmd$ = "delete" then
         if len(filenames$(1)) = 0 then
             #log loadfile$()
         end if
     end if
+    if cmd$ = "delete" then
+        deleting = 1
+        #log runtmp$(1)
+        #log delete$()
+        deleting = 0
+    end if
     if cmd$ = "update" then
         updating = 1
         #log runtmp$(1)
-        #log update$(0)
+        #log update$(0, 0)
         updating = 0
     end if
     if cmd$ = "report" then
@@ -442,6 +463,7 @@ end function
         #log report$()
         reporting = 0
     end if
+    #log cleartmp$()
     #log clearvars$()
     wait
 
